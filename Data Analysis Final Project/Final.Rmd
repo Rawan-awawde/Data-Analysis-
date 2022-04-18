@@ -1,0 +1,636 @@
+---
+title: "Intro to Statistics and Data Analysis with R (0560.1823)"
+subtitle: "TV Shows- A platformwise analysis"
+author: "Lian Brave, Rawan Awawde, Shada saleh"
+date: "27.06.2021"
+output:
+  html_document: default
+
+---
+<img src="https://upload.wikimedia.org/wikipedia/en/thumb/b/b3/Tel_Aviv_university_logo.svg/1200px-Tel_Aviv_university_logo.svg.png" height="200px" width="700px"/>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = TRUE,
+	warning = FALSE
+)
+```
+# Background <br>
+This TV_shows dataset comprises a comprehensive list of tv shows available on various streaming platforms such as Netflix, Hulu, Disney+ and Prime Video.<br>
+Ratings for these shows is also available in the form of IMDB and Rotten Tomatoes.<br>
+We notice that the dataset also shows the target age group against a particular show is interested in as well as the year the show was originally published in. 
+
+![](https://cdn.netmotionsoftware.com/wp-content/uploads/streaming-services-header.png)
+
+This data was taken from Kaggle with this link:  https://www.kaggle.com/ruchi798/tv-shows-on-netflix-prime-video-hulu-and-disney <br>
+
+## Loading the initial packages.
+```{r message=FALSE, warning=FALSE}
+
+library(rattle) #using it for free graphical interface for data 
+library(magrittr) # in order to utilise %>% and %<>% pipeline operators.
+library(Hmisc, quietly=TRUE) # The 'Hmisc' package provides the 'contents' function.
+library(fBasics, quietly=TRUE)
+library(skimr) #skimr is designed to provide summary statistics about variables in data frames
+library(rmarkdown) #Convert R Markdown documents into a variety of formats including HTML, MS Word, PDF, and Beamer.٠
+library(DT) #The main function in this package is datatable. It creates an HTML widget to display R data objects with DataTables.
+library(corrplot, quietly=TRUE) #The 'corrplot' package provides the 'corrplot' function.
+library(readxl)
+library(tidyverse)
+library(gridExtra) #helps to arrange multiple grid-based plots on a page, and draw tables.
+
+```
+
+## Set Seed
+A pre-defined value is used to reset the random seed so that results are repeatable.
+```{r}
+crv$seed <- 42 
+```
+
+## Load a dataset from file.
+```{r}
+fname <- "C:/Users/user/Desktop/Group 37/tv_shows.csv" 
+TV_shows <- read.csv(fname,
+			na.strings=c(".", "NA", "", "?"),
+			strip.white=TRUE, encoding="UTF-8")
+#na.strings=All the entries having NA,".","","?" will be converted into na.
+TV_shows$Rotten.Tomatoes <- as.numeric(sub("%","",TV_shows$Rotten.Tomatoes))/100
+```
+
+# Tidying the Dataset
+
+```{r}
+set.seed(crv$seed)
+# The following variable selections have been noted for easy using in coding.
+# SHOWnumeric - just the numeric columns
+# SHOWinput - all the columns (data)
+# SHOWcategoric - has just a categoric columns
+#we will make new variables along with the project according to what we need.
+
+SHOWinput     <- c("Title", "Age", "IMDb", "Rotten.Tomatoes",
+                   "Netflix", "Hulu", "Prime.Video", "Disney.")
+
+SHOWnumeric   <- c("IMDb", "Netflix", "Hulu", "Prime.Video",
+                   "Disney.")
+
+SHOWcategoric <- c("Title", "Age", "Rotten.Tomatoes")
+
+SHOWtarget    <- "Year"
+SHOWrisk      <- NULL
+
+Rate =ceiling(as.numeric(TV_shows$IMDb))
+TV_shows<-TV_shows%>%
+  mutate(Rate)
+```
+
+# Exploratory Data Analysis(EDA)
+EDA is primarily used to see what data can reveal beyond the formal modeling or hypothesis testing task and provides a better understanding of data set variables and the relationships between them. 
+It will also help us determine if the statistical techniques we are considering for data analysis are appropriate.
+
+## Summarizing the Data
+Looking at the contents of the data.
+
+```{r}
+# Obtain a summary of the dataset.
+contents(TV_shows)
+summary(TV_shows)
+```
+## Another Way for Summarizing All the Data:
+```{r}
+#Display the Structure of the data table
+str(TV_shows)
+# skim: an alternative summary,provides summary statistics about variables
+skim(TV_shows)
+# display the Data
+paged_table(head(TV_shows), options = list(rows.print = 10))
+# Another method to display all the data in a convenient way
+datatable(TV_shows)
+```
+# Describing the Data
+The 'Hmisc' package provides the 'describe' function. <br>
+The description shows the missing and distinct values. <br>
+```{r}
+# Generate a description of the dataset.
+
+describe(TV_shows)
+```
+
+# Visulations
+*In a boxplot, the midline is the median of your data, with the upper and lower limits of the box being the third and first quartile1 (75th and 25th percentile).* 
+*For each box plots, the mean indicated by the ٭ *
+<br>
+
+## Use ggplot2 to generate box plots
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  ggplot(aes(y=Year)) +
+  geom_boxplot(aes(x="NA"), notch=FALSE, fill="#9f0002") +
+  stat_summary(aes(x="NA"), fun=mean, geom="point", shape=8) +
+  geom_boxplot(aes(x=Age, fill=Age), notch=FALSE)+
+  stat_summary(aes(x=Age), fun=mean, geom="point", shape=8) +
+  xlab("Age") +
+  ggtitle("Distribution of Year \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  theme(legend.position="none") 
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*It is clear from the above figure that movies for ages 18+ is relatively have the latest movies than the rest.Also as we can see Outliers are observed when data is grouped by all ages.* <br>
+
+## Use ggplot2 to generate bar plot for IMDb rating.
+
+```{r}
+rating_data<-TV_shows %>%
+  group_by(Rate) %>%
+  tally %>%
+  filter(!is.na(Rate))
+
+ggplot(rating_data, aes(x=Rate, y=n)) +
+  geom_bar(aes(color = Rate,
+               fill=Rate),
+           stat='identity',
+           colour="black",
+           position=position_dodge())+
+  xlab("IMDb Rating") +
+  ylab("TV Shows") + 
+  ggtitle("TV Shows By IMDb Rating") + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust=0.5,size = 20))+
+  xlim("1", "2", "3", "4", "5" , "6", "7", "8", "9", "10")
+```
+<br>
+
+## Use ggplot2 to generate box plot for Netflix
+
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  ggplot(aes(y=Netflix)) +
+  geom_boxplot(aes(x="NA"), notch=FALSE, fill="grey") +
+  stat_summary(aes(x="NA"), fun=mean, geom="point", shape=8) +
+  geom_boxplot(aes(x=Age, fill=Age), notch=FALSE) +
+  stat_summary(aes(x=Age), fun=mean, geom="point", shape=8) +
+  xlab("Age") +
+  ggtitle("Distribution of Netflix \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  theme(legend.position="none")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*As we can see most of the movies which are distributed by different ages have a high probability  to be produced by Netflix* <br>
+*Outliers are observed in the Box plots above: The values of the distribution of Netflix by age almost at the same probability (around 0.45), except than the movies for ages of 13+ and 18+ which are nearly (0.5) and (0.75).*    
+
+## Use ggplot2 to generate box plot for Hulu
+
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  ggplot(aes(y=Hulu)) +
+  geom_boxplot(aes(x="NA"), notch=FALSE, fill="grey") +
+  stat_summary(aes(x="NA"), fun=mean, geom="point", shape=8) +
+  geom_boxplot(aes(x=Age, fill=Age), notch=FALSE) +
+  stat_summary(aes(x=Age), fun=mean, geom="point", shape=8) +
+  xlab("Age") +
+  ggtitle("Distribution of Hulu \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  theme(legend.position="none")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*all the movies which are distributed by different ages have a high probability  to be produced by hulu, however the ages 13+ are not produced by hulu.* <br>
+*Outliers are observed in the Box plots above: The values of the distribution of hulu by age except 18+ and all and 13+ almost at the same probability,(the movies for ages 18+ and for all ages  are nearly (0.25))*   
+
+
+## Use ggplot2 to generate box plot for Prime.Video
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  ggplot(aes(y=Prime.Video)) +
+  geom_boxplot(aes(x="NA"), notch=FALSE, fill="grey") +
+  stat_summary(aes(x="NA"), fun=mean, geom="point", shape=8) +
+  geom_boxplot(aes(x=Age, fill=Age), notch=FALSE) +
+  stat_summary(aes(x=Age), fun=mean, geom="point", shape=8) +
+  xlab("Age") +
+  ggtitle("Distribution of Prime.Video \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  theme(legend.position="none")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*Movies which are distributed by ages (7+ and all ages) have a high probability to be distributed by Prime.video, however the movies for age 13+ has a median of (0.25).*
+
+
+## Use ggplot2 to generate box plot for Disney.
+
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  ggplot(aes(y=Disney.)) +
+  geom_boxplot(aes(x="NA"), notch=FALSE, fill="grey") +
+  stat_summary(aes(x="NA"), fun=mean, geom="point", shape=8) +
+  geom_boxplot(aes(x=Age, fill=Age), notch=FALSE) +
+  stat_summary(aes(x=Age), fun=mean, geom="point", shape=8) +
+  xlab("Age") +
+  ggtitle("Distribution of Disney. \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  theme(legend.position="none")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+
+## Boxplot of Rotten Tomatoes by Age
+
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  select(Rotten.Tomatoes, Age) %>%
+  ggplot(aes(y=Rotten.Tomatoes)) +
+    geom_boxplot(aes(x="NA"), notch=FALSE, fill="grey") +
+    stat_summary(aes(x="NA"), fun=mean, geom="point", shape=8) +
+    geom_boxplot(aes(x=Age, fill=Age), notch=FALSE) +
+    stat_summary(aes(x=Age), fun=mean, geom="point", shape=8) +
+    xlab("Age") +
+    ggtitle("Distribution of Rotten Tomatoes \nby Age") +
+    scale_fill_brewer(palette="BuPu")+
+    theme(legend.position="none")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*Its clear that the movies for 13+ gave the lowest Rotten Tomatoes rating, while the other movies relatively have a similar median Rotten Tomatoes values around 80%.* 
+
+## Use ggplot2 to generate density plot for Year
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  select(Year, Age) %>%
+  ggplot(aes(x=Year)) +
+  geom_density(lty=3) +
+  geom_density(aes(fill=Age, colour=Age), alpha=0.55) +
+  xlab("Year") +
+  ggtitle("Distribution of Year \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  labs(fill="Age", y="Density")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*At this density plot as we can see most of the movies for age 13+ were produced in 2000 (has the high point of density), however, for the other age ranges, production year is left skewed and centered around nearly 2015.*
+
+## Use ggplot2 to generate density plot for IMDb
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  select(IMDb, Age) %>%
+  ggplot(aes(x=IMDb)) +
+  geom_density(lty=3) +
+  geom_density(aes(fill=Age, colour=Age), alpha=0.55) +
+  xlab("IMDb") +
+  ggtitle("Distribution of IMDb \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  labs(fill="Age", y="Density")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*Here as we can see there are two “humps”  by ages +13 at this distribution. A possible explanation to this is:the difference of values for the movie production quality (those who have a good production had a higher IMDb, for example). All the values of ages are left skewed with different IMDb mean .* <br>
+
+## Use ggplot2 to generate density plot for Netflix
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  select(Netflix, Age) %>%
+  ggplot(aes(x=Netflix)) +
+  geom_density(lty=3) +
+  geom_density(aes(fill=Age, colour=Age), alpha=0.55) +
+  xlab("Netflix") +
+  ggtitle("Distribution of Netflix \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  labs(fill="Age", y="Density")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>
+*The distribution of Netflix production movies by age have two peaks: one at 0 and the other one at 1 and that is because the variable Netflix is binary and they represent two local maximums; these are points where the data points stop increasing and start decreasing.*  
+
+## Use ggplot2 to generate density plot for Hulu
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  select(Hulu, Age) %>%
+  ggplot(aes(x=Hulu)) +
+  geom_density(lty=3) +
+  geom_density(aes(fill=Age, colour=Age), alpha=0.55) +
+  xlab("Hulu") +
+  ggtitle("Distribution of Hulu \nby Age") +
+    scale_fill_brewer(palette="BuPu")+
+  labs(fill="Age", y="Density")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>*We can see there are two “humps” but this time by all ages. So here also the same possible explanation for this density plot .* <br>
+
+## Use ggplot2 to generate density plot for Prime.Video
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  select(Prime.Video, Age) %>%
+  ggplot(aes(x=Prime.Video)) +
+  geom_density(lty=3) +
+  geom_density(aes(fill=Age, colour=Age), alpha=0.55) +
+  xlab("Prime.Video") +
+  ggtitle("Distribution of Prime.Video \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  labs(fill="Age", y="Density")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>*this density is almost like the density plot for Netflix, we can see there are two “humps” for all ages,with the same possible explanation.* <br>
+
+## Use ggplot2 to generate density plot for Disney.
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  mutate(Age=as.factor(Age)) %>%
+  select(Disney., Age) %>%
+  ggplot(aes(x=Disney.)) +
+  geom_density(lty=3) +
+  geom_density(aes(fill=Age, colour=Age), alpha=0.55) +
+  xlab("Disney.") +
+  ggtitle("Distribution of Disney. \nby Age") +
+  scale_fill_brewer(palette="BuPu")+
+  labs(fill="Age", y="Density")
+
+# Display the plots.
+grid.arrange(p01)
+
+```
+<br>
+*All these graphs show that the data points are right skewed. The data contains a large number of data points for just a few values, thereby making the frequency distribution quite skewed.
+Moreover, these graphs also show the sparsity in data. 
+Sparsity: The data may also reflect the occurrence of a rare event such as a Pandemic which hit in the year 2020 and the greater number of shows being published in 2020 can be attributed to increase in viewership during the Lockdown.*
+
+## Barplot for Rotten Tomatoes
+```{r warning=FALSE}
+p01 <- TV_shows[,] %>%
+  select(Rotten.Tomatoes, Year) %>%
+  group_by(Year) %>%
+  summarise(mean.rate = mean(Rotten.Tomatoes, na.rm=TRUE)) %>%
+  ggplot(aes(x=Year, y=mean.rate)) +
+    geom_bar(stat = "identity", width=0.2)  +
+    coord_flip()+
+    xlab("Year") +
+    ggtitle("Distribution of Rotten Tomatoes rating \nby Year") +
+    scale_fill_brewer(palette="BuPu")+
+    labs(y="Rotten Tomato rating")
+
+# Display the plots.
+grid.arrange(p01)
+```
+<br>*The mean rating for movies in Rotten Tomatoes is between 65% and 80% for most years, except the years 1991-1993 and 1968-1969 and 1965 where the average ratings were above 80%.* <br>
+
+# Correlations
+## Generate a correlation plot for the variables. 
+```{r}
+# The 'corrplot' package provides the 'corrplot' function.
+# Correlations work for numeric variables only.
+#Pairwise comparison generally is any process of comparing entities in pairs to judge which of each entity is preferred, or has a greater amount of some quantitative property, or whether or not the two entities are identical.
+SHOWcor <- cor(TV_shows[,c(SHOWnumeric, "Rotten.Tomatoes")], use="pairwise", method="pearson")
+```
+
+## Order the correlations by their strength.
+```{r}
+SHOWord <- order(SHOWcor[1,])
+SHOWcor <- SHOWcor[SHOWord, SHOWord]
+# Display the actual correlations.
+print(SHOWcor)
+```
+## Graphically display the correlations.
+```{r}
+corrplot(SHOWcor, mar=c(0,0,1,0))
+title(main="Correlation using Pearson")
+```
+<br>
+
+## Hierarchical Variable Correlation 
+
+### Generate the correlations (numerics only).
+
+```{r}
+cc <- cor(TV_shows[,c(SHOWnumeric, "Rotten.Tomatoes")], use="pairwise", method="pearson")
+
+# Generate hierarchical cluster of variables.
+
+hc <- hclust(dist(cc), method="average")
+
+# Generate the dendrogram.
+
+dn <- as.dendrogram(hc)
+
+# Now draw the dendrogram.
+
+op <- par(mar = c(3, 4, 3, 3.71))
+plot(dn, horiz = TRUE, nodePar = list(col = 3:2, cex = c(2.0, 0.75), pch = 21:22, bg=  c("light blue", "pink"), lab.cex = 0.75, lab.col = "tomato"), edgePar = list(col = "gray", lwd = 2), xlab="Height")
+title(main="Variable Correlation Clusters using Pearson")
+par(op) #par can be used to set or query graphical parameters.
+```
+
+# Models
+## T-test
+-t-test is a type of inferential statistic used to determine if there is a significant difference between  the means of two groups, which may be related in certain features. <br>
+- we reject H0 if alpha greater than p-value <br>
+-H0-Null hypothesis:  the average rating between two platforms is equal. <br>
+-H1-Alternative hypothesis: the average rating on platform is greater than the other. <br>
+We will test our assumption with a 95% confidence level. <br>
+alpha = 5% <br>
+Reject H0 if p value is less than 5% <br>
+```{r}
+
+Platform_All=case_when(
+    TV_shows$Netflix==1 & TV_shows$Hulu==0 & TV_shows$ Prime.Video==0 & TV_shows$'Disney.'==0 ~"Netflix",
+    TV_shows$Netflix==0 & TV_shows$Hulu==1 & TV_shows$Prime.Video==0 & TV_shows$'Disney.'==0 ~"Hulu",
+    TV_shows$Netflix==0 & TV_shows$Hulu==0 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==0 ~"Prime_Video",
+    TV_shows$Netflix==0 & TV_shows$Hulu==0 & TV_shows$Prime.Video==0 & TV_shows$'Disney.'==1 ~"Disney+",
+    TV_shows$Netflix==1 & TV_shows$Hulu==1 & TV_shows$Prime.Video==0 & TV_shows$'Disney.'==0 ~"Netflix&Hulu",
+    TV_shows$Netflix==1 & TV_shows$Hulu==0 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==0 ~"Netflix&Prime",
+    TV_shows$Netflix==1 & TV_shows$Hulu==0 & TV_shows$Prime.Video==0 & TV_shows$'Disney.'==1 ~"Netflix&Disney",
+    TV_shows$Netflix==0 & TV_shows$Hulu==1 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==0 ~"Hulu&Prime",
+    TV_shows$Netflix==0 & TV_shows$Hulu==1 & TV_shows$Prime.Video==0 & TV_shows$'Disney.'==1 ~"Hulu&Disney",
+    TV_shows$Netflix==0 & TV_shows$Hulu==0 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==1 ~"Prime&Disney",
+    TV_shows$Netflix==1 & TV_shows$Hulu==1 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==0 ~"Netflix&Hulu&Prime",
+    TV_shows$Netflix==1 & TV_shows$Hulu==1 & TV_shows$Prime.Video==0 & TV_shows$'Disney.'==1 ~"Netflix&Hulu&Disney",
+    TV_shows$Netflix==0 & TV_shows$Hulu==1 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==1 ~"Hulu&Prime&Disney",
+    TV_shows$Netflix==1 & TV_shows$Hulu==1 & TV_shows$Prime.Video==1 & TV_shows$'Disney.'==1 ~"All Platforms")
+
+TV_shows <-TV_shows %>%
+  mutate(Platform_All)
+Netflix_rate<-TV_shows[TV_shows$Platform_All == "Netflix","Rate"]
+Hulu_rate <-TV_shows[TV_shows$Platform_All == "Hulu","Rate"]
+Disney_rate<-TV_shows[TV_shows$Platform_All == "Disney+","Rate"]
+Prime_rate<-TV_shows[TV_shows$Platform_All == "Prime_Video","Rate"]
+```
+
+-H0-Null hypothesis:  the average rating on Netflix equal to Hulu’s rating. <br>
+-H1-Alternative hypothesis: the average rating on Netflix is greater than Hulu’s 
+PV of t-test of Netflix and Hulu is 0.0002101 <0.05 smaller than alpha (we reject H0). <br>
+```{r}
+t.test(x = Netflix_rate, 
+       y = Hulu_rate,
+       alternative = "greater")
+```
+-H0-Null hypothesis: the average rating on Disney equal to hulu’s rating. <br>
+-H1-Alternative hypothesis: the average rating on Disney is greater than Hulu’s 
+PV of t-test of Disney and Hulu is 0.7872 >0.05 greater than alpha (5%) <br>
+We will not reject H0.
+```{r}
+t.test(x = Disney_rate, 
+       y = Hulu_rate,
+       alternative = "greater")
+```
+H0-Null hypothesis: the average rating on prime_video equal to hulu’s rating. <br>
+-H1-Alternative hypothesis: the average rating on prime_video is greater than Hulu’s
+PV of t-test of Prime_video and Hulu is 0.0002738 <0.05 smaller than alpha(5%)
+H0 is rejected.
+```{r}
+t.test(x = Prime_rate, 
+       y = Hulu_rate,
+       alternative = "greater")
+```
+
+## F test
+H0: No difference in variances of Hulu and Disney <br>
+H1: there is difference in variances <br>
+we didnt reject H0 because The p-value of F-test is 0.3984. It’s greater than the significance level alpha = 0.05.<br> In conclusion, there is no significant difference between the variances of the two sets of data.
+
+```{r}
+var.test(x= Hulu_rate,y= Disney_rate ,alternative = "two.sided")
+```
+H0: No difference in variances of Netflix and Disney. <br>
+H1: there is difference in variances <br>
+we didnt reject H0 because The p-value of F-test is 0.5739 It’s greater than the significance level alpha = 0.05. <br>In conclusion, there is no significant difference between the variances of the two sets of data.  
+
+```{r}
+var.test(x= Netflix_rate,y= Disney_rate ,alternative = "two.sided")
+```
+
+H0: No difference in variances of Prime and Disney <br>
+H1: there is difference in variances <br>
+we didnt reject H0 because The p-value of F-test is 0.9441 It’s greater than the significance level alpha = 0.05.<br> In conclusion, there is no significant difference between the variances of the two sets of data
+```{r}
+var.test(x= Prime_rate,y= Disney_rate ,alternative = "two.sided")
+```
+
+## Regression model
+### Linear Regression model.
+```{r model1}
+TV_shows = TV_shows%>%
+  mutate(Rating =ceiling(as.numeric(TV_shows$IMDb)))
+Platform=case_when(
+    TV_shows$Netflix ==1 & TV_shows$Hulu==0 & TV_shows$Prime.Video  ==0 & TV_shows$Disney.           == 0 ~"Netflix",
+    TV_shows$Netflix ==0 & TV_shows$Hulu==1 & TV_shows$Prime.Video  ==0 & TV_shows$Disney. == 0 ~"Hulu",
+    TV_shows$Netflix ==0 & TV_shows$Hulu==0 & TV_shows$Prime.Video  ==1 & TV_shows$Disney. == 0 ~"Prime Video",
+   TV_shows$Netflix ==0 & TV_shows$Hulu==0 & TV_shows$Prime.Video  ==0 & TV_shows$Disney. == 1 ~"Disney+",TRUE ~ NA_character_)
+
+data_rate<-TV_shows%>%
+  mutate(Platform)%>%
+  filter(!is.na(IMDb),!is.na(Age))%>%
+  select(Title,Year,Age,Platform,Rotten.Tomatoes,Rating)
+
+
+ggplot(data_rate, mapping = aes(x = Year, y = Rating)) +
+  stat_smooth(method = "lm", formula = y~x)
+
+model1 <- lm(formula = Rating ~ Year , data=data_rate)
+par(mfrow=c(2,2)) # init 4 charts in 1 panel
+plot(model1 )
+
+show(model1)
+summary(model1)
+
+```
+*Coefficients:* <br> The coefficients of the fitted function and how significant they are.
+
+Estimate: Value of the coefficient <br>
+Std. Error: Standard error <br>
+t-value: Indicates if this value is meaningful in the model <br>
+Pr(>|t|): p-value, the smaller the value the better. The stars to the right indicate how "good" the p-value is. <br>
+Signif. codes: this is just a legend for the number of stars next to the p-values.<br>
+With the graph we see that with more years the rating is descending. <br>
+Adjusted R-squared:  0.005692 which is very low, which means that only 0.05% of the variation in the dependent variable is explained by the independent variable.  <br>
+The p-Value is very low : p-value: 2.346e-05 . <br>
+a linear model is considered to be statistically significant when p-Value is less than the statistical significance level, which is 5%. 
+<br>
+
+The model predicts with statistical significance that the variable Year is negatively associated to the Rating, more precisely, when the production year increases by one it is likely that the Rating will decrease by 0.008051.  
+The Residuals against fitted values plot shows that the residuals are not evenly distributed over observations.
+
+The second plot (normal Q-Q) is a normal probability plot.It will give a straight line if the errors are distributed normally, but points deviate from the straight line, indicating that our random values do not follow a normal distribution.
+
+## Multiple linear regression
+```{r model2}
+model2<-lm(Rating ~ Year+ Age + Platform , data=data_rate)
+
+par(mfrow=c(2,2)) # init 4 charts in 1 panel
+plot(model2)
+
+show(model2)
+plot(model2)
+summary(model2) # Generate a textual view of the Linear model.
+AIC(model1)
+AIC(model2)
+
+```
+AIC
+The Akaike information criterion (AIC) is an estimator of prediction error and thereby relative quality of statistical models for a given set of data. 
+
+AIC is calculated from:
+
+1) the number of independent variables used to build the model.
+2) the maximum likelihood estimate of the model (how well the model reproduces the data). <br>
+We can see that model2 has a lower AIC value, thus it better than model1.
+
+This multiple linear regression model has an R squared equal to 0.05347 which means that the model can predict 5.34% of Rating variability, which is more than the R squared of the previous simple regression model (R-squared = 0.005).  
+The coefficient estimates of the variables Age all, PlatformHullu, PlatformNetflix, PlatformPrime Video are not statistically significant. 
+The model predicts with statistical significance that, controlling the other variables, Year is negatively associated to Rating, and when year increases by one unit, rating is likely to decrease by 0.014599, it also predicts that when age category is 16+, rating is likely to be 1.5346 times higher than rating of age category 13+, and when age category is 18+, rating is likely to be 1.6448 times higher than rating of age category 13+, and when age category is 7+, rating is likely to be 1.01 times higher than rating of age category 13+.   
+
+
+
+### Analysis of Variance
+Analysis of Variance (ANOVA) consists of calculations that provide information about levels of variability within a regression model and form a basis for tests of significance. 
+Our F-Value considered good (17.939) and the p-value is very low too,Thats mean that we will except that there is a relation between Year and Rating of the movie.
+```{r}
+
+cat('==== ANOVA ====')
+print(anova(model1))
+
+
+```
+
+
+### Heteroscedacity
+Notice in the chart of residuals vs fitted values that if there is absolutely no heteroscedastity, you should see a completely random, equal distribution of points throughout the range of X axis and a flat red line.That isnt the case with our model.
+So, the inference here is, heteroscedasticity does exist.
+Absence of heteroscedasticity of residuals means that the variance of residuals should not increase with fitted values of response variable.But here its the opposite.
+In essence this model is overfit to the data because of the limited size of the dataset. 
+
+
+
+### Conclusion
+To model the relationship between the year of publication and the affect on its rating on different platforms, the shows are modeled using Linear Regression. The degrees of freedom is number of observations minus the number of coefficients (including intercepts). The larger this number is the better, and is recorded as 3134 degrees. 
+Limitations of this model include high multicollinearity, and overfitting on the data due to small size of the data. In essence this model overfits the data because of the limited size of the dataset. Presence of high occurrence of missing values also negatively affected the accuracy of the linear model.
